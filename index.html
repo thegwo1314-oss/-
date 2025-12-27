@@ -1,0 +1,695 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>红薯生意全能管家</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        -webkit-tap-highlight-color: transparent; /* Disable tap highlight on mobile */
+      }
+      @keyframes placeholder-fade {
+        0%,
+        100% {
+          opacity: 0.4;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+      .placeholder-animate::placeholder {
+        animation: placeholder-fade 3s infinite ease-in-out;
+      }
+      /* Custom styles for the range slider track */
+      .slider-track {
+        --slider-color: #4ade80; /* Default green color */
+        -webkit-appearance: none;
+        appearance: none;
+        background: transparent;
+      }
+      .slider-track::-webkit-slider-runnable-track {
+        height: 1.25rem;
+        border-radius: 9999px;
+        background: var(--slider-color);
+        transition: background 0.2s ease-in-out;
+      }
+      .slider-track::-moz-range-track {
+        height: 1.25rem;
+        border-radius: 9999px;
+        background: var(--slider-color);
+        transition: background 0.2s ease-in-out;
+      }
+       .slider-track::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        margin-top: -6px; /* Position thumb vertically */
+        background-color: white;
+        height: 2.25rem;
+        width: 2.25rem;
+        border-radius: 9999px;
+        border: 4px solid #64748b;
+        box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      }
+      .slider-track::-moz-range-thumb {
+        background-color: white;
+        height: 2.25rem;
+        width: 2.25rem;
+        border-radius: 9999px;
+        border: 4px solid #64748b;
+        box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      }
+    </style>
+    <!-- Babel for in-browser JSX transpilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- React and ReactDOM UMD builds -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // All React code is now inlined here
+        const { useState, useMemo, useEffect } = React;
+
+        const SETTINGS_KEY = 'sweetPotatoCalculatorSettings';
+
+        // --- Reusable UI Components (Shared Across Pages) ---
+
+        const InputWithSteppers = ({ label, unit, value, onChange: propOnChange, placeholder, type = "number", step = 10, integerOnly = true }) => {
+            const handleStep = (amount) => {
+                const currentValue = parseFloat(value) || 0;
+                const newValue = Math.max(0, currentValue + amount);
+                const event = { target: { value: String(newValue) } };
+                propOnChange(event);
+            };
+
+            const handleInputChange = (e) => {
+                const { value } = e.target;
+                if (value === '' || (integerOnly ? /^\d*$/.test(value) : /^\d*\.?\d*$/.test(value))) {
+                    propOnChange(e);
+                }
+            };
+            
+            return (
+                <div className="mb-4">
+                    <label className="block text-2xl font-medium text-gray-700 mb-2">{label}</label>
+                    <div className="flex items-center">
+                        <button 
+                            type="button"
+                            onClick={() => handleStep(-step)} 
+                            className="text-5xl font-bold text-blue-600 bg-blue-100 rounded-l-xl px-5 h-20 hover:bg-blue-200 active:scale-95 transition-transform"
+                            aria-label={`Decrease by ${step}`}
+                        >
+                            -
+                        </button>
+                        <div className="relative flex-grow">
+                            <input 
+                                type={type} 
+                                value={value} 
+                                onChange={handleInputChange} 
+                                placeholder={placeholder} 
+                                className="w-full text-4xl p-4 bg-white border-y-2 border-blue-500 h-20 text-center font-bold outline-none" 
+                                pattern="\d*" 
+                                inputMode={type === 'number' ? 'decimal' : 'text'} 
+                            />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-2xl font-semibold text-gray-500 pointer-events-none">{unit}</span>
+                        </div>
+                        <button 
+                            type="button"
+                            onClick={() => handleStep(step)} 
+                            className="text-5xl font-bold text-blue-600 bg-blue-100 rounded-r-xl px-5 h-20 hover:bg-blue-200 active:scale-95 transition-transform"
+                            aria-label={`Increase by ${step}`}
+                        >
+                            +
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+
+        const SettingInput = ({ label, unit, value, onChange }) => (
+            <div className="flex items-center justify-between mb-2">
+                <label className="text-xl text-gray-600">{label}</label>
+                <div className="flex items-center w-36 bg-white border border-gray-300 rounded-md">
+                    <input type="number" value={value} onChange={onChange} className="w-full text-xl p-2 bg-transparent outline-none text-right" pattern="\d*\.?\d*" inputMode="decimal" />
+                    <span className="text-lg text-gray-500 pr-2">{unit}</span>
+                </div>
+            </div>
+        );
+
+        const SalesCard = ({ title, bgColor, wholesaleCount, setWholesaleCount, retailCount, setRetailCount }) => (
+            <div className={`${bgColor} border rounded-xl p-4 mb-6`}>
+                <h3 className="text-2xl font-bold text-slate-800 mb-4">{title}</h3>
+                <InputWithSteppers label="批发价卖了多少袋？" unit="袋" value={wholesaleCount} onChange={e => setWholesaleCount(e.target.value)} placeholder="0" />
+                <InputWithSteppers label="零售价卖了多少袋？" unit="袋" value={retailCount} onChange={e => setRetailCount(e.target.value)} placeholder="0" />
+            </div>
+        );
+
+        const RateButton = ({ label, isSelected, onClick }) => (
+          <button
+            type="button"
+            onClick={onClick}
+            className={`w-full py-4 text-xl sm:text-2xl font-bold rounded-xl transition-all duration-200 ease-in-out transform active:scale-95 shadow-md ${
+              isSelected
+                ? 'bg-emerald-600 text-white ring-4 ring-emerald-300'
+                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+            }`}
+          >
+            {label}
+          </button>
+        );
+
+        const CostToggleInput = ({ id, label, isChecked, onToggleChange, costValue, onCostChange }) => (
+            <div className="flex items-center justify-between bg-white p-2 rounded-lg border-2 mb-4">
+                <div className="flex items-center">
+                    <input 
+                        id={id} 
+                        type="checkbox" 
+                        checked={isChecked} 
+                        onChange={e => onToggleChange(e.target.checked)} 
+                        className="h-8 w-8 accent-rose-600" 
+                    />
+                    <label htmlFor={id} className="ml-4 text-2xl font-medium">{label}</label>
+                </div>
+                <div className="flex items-center">
+                    <span className="text-2xl font-medium mr-2">+</span>
+                    <input 
+                        type="number" 
+                        value={costValue}
+                        onChange={e => onCostChange(e.target.value)}
+                        className="w-24 text-2xl font-bold text-right bg-gray-100 rounded-md p-2 outline-none border border-gray-300 focus:ring-2 focus:ring-rose-400"
+                        inputMode="decimal"
+                    />
+                    <span className="text-2xl font-medium ml-2">元</span>
+                </div>
+            </div>
+        );
+
+        const ProgressBar = ({ grossProfit, totalMiscFees }) => {
+            if (totalMiscFees <= 0) return null;
+            const progress = Math.min(100, (grossProfit / totalMiscFees) * 100);
+            const isBreakEven = progress >= 100;
+            const amountToBreakEven = totalMiscFees - grossProfit;
+
+            return (
+                <div className="my-6">
+                    <div className="w-full bg-gray-300 rounded-full h-8 border border-gray-400 overflow-hidden">
+                        <div 
+                            className={`h-full rounded-full transition-all duration-500 ease-out ${isBreakEven ? 'bg-green-500' : 'bg-red-500'}`} 
+                            style={{ width: `${progress}%` }}
+                        ></div>
+                    </div>
+                    <p className={`text-center text-xl mt-2 font-bold ${isBreakEven ? 'text-green-700' : 'text-red-700'}`}>
+                        {isBreakEven 
+                            ? "恭喜！已回本，现在开始赚钱！" 
+                            : `加油！还差 ${amountToBreakEven.toFixed(2)} 元回本`}
+                    </p>
+                </div>
+            );
+        };
+
+        // --- Page 1: Purchase Advisor (草稿模式) ---
+        const PurchaseAdvisor = () => {
+            const [totalPrice, setTotalPrice] = useState('');
+            const [totalWeight, setTotalWeight] = useState('');
+            const [deductionRate, setDeductionRate] = useState(0.05);
+            const [miscCosts, setMiscCosts] = useState('300');
+            const [estimatedSellPrice, setEstimatedSellPrice] = useState('');
+            const [result, setResult] = useState(null);
+
+            const handleCalculate = () => {
+                const price = parseFloat(totalPrice) || 0;
+                const weight = parseFloat(totalWeight) || 0;
+                const misc = parseFloat(miscCosts) || 0;
+                const sellPrice = parseFloat(estimatedSellPrice) || 0;
+
+                if (price <= 0 || weight <= 0 || sellPrice <= 0) {
+                    alert('请填写完整的报价、总重和预估卖价！');
+                    setResult(null);
+                    return;
+                }
+
+                const netWeight = weight * (1 - deductionRate);
+                if (netWeight <= 0) {
+                    alert('总重扣除杂质后需大于0！');
+                    setResult(null);
+                    return;
+                }
+                
+                const trueCostPerJin = price / netWeight;
+                const estimatedGrossProfit = (netWeight * sellPrice) - (price + misc);
+                const PROFIT_THRESHOLD = 1000;
+                const isProfitable = estimatedGrossProfit > PROFIT_THRESHOLD;
+
+                let suggestedTotalPrice = null;
+                let suggestedCostPerJin = null;
+
+                if (!isProfitable) {
+                    suggestedTotalPrice = (netWeight * sellPrice) - misc - PROFIT_THRESHOLD;
+                    suggestedCostPerJin = suggestedTotalPrice > 0 ? suggestedTotalPrice / netWeight : 0;
+                }
+
+                setResult({
+                    trueCostPerJin,
+                    estimatedGrossProfit,
+                    isProfitable,
+                    suggestedTotalPrice,
+                    suggestedCostPerJin
+                });
+            };
+            
+            return (
+                <div className="w-full max-w-lg bg-white p-6 sm:p-8 rounded-2xl shadow-2xl border border-gray-200">
+                    <h1 className="text-4xl sm:text-5xl font-bold text-slate-800 text-center mb-8">进货参考</h1>
+                    <InputWithSteppers label="对方报价总额" unit="元" value={totalPrice} onChange={e => setTotalPrice(e.target.value)} placeholder="例如 8000" step={100} integerOnly={false} />
+                    <InputWithSteppers label="对方称重总重" unit="斤" value={totalWeight} onChange={e => setTotalWeight(e.target.value)} placeholder="例如 10000" step={100} integerOnly={false} />
+                    
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+                        <h3 className="text-2xl font-bold text-amber-800 mb-3">杂质/皮重扣除</h3>
+                        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                            <button onClick={() => setDeductionRate(0)} className={`py-3 text-lg font-bold rounded-lg ${deductionRate === 0 ? 'bg-amber-600 text-white' : 'bg-amber-200'}`}>干净货 (不扣)</button>
+                            <button onClick={() => setDeductionRate(0.05)} className={`py-3 text-lg font-bold rounded-lg ${deductionRate === 0.05 ? 'bg-amber-600 text-white' : 'bg-amber-200'}`}>一般带泥 (-5%)</button>
+                            <button onClick={() => setDeductionRate(0.10)} className={`py-3 text-lg font-bold rounded-lg ${deductionRate === 0.10 ? 'bg-amber-600 text-white' : 'bg-amber-200'}`}>泥大/带筐 (-10%)</button>
+                        </div>
+                    </div>
+
+                    <InputWithSteppers label="预估平均卖价" unit="元/斤" value={estimatedSellPrice} onChange={e => setEstimatedSellPrice(e.target.value)} placeholder="例如 1.2" step={0.1} integerOnly={false} />
+                    <InputWithSteppers label="拉回运费/杂费" unit="元" value={miscCosts} onChange={e => setMiscCosts(e.target.value)} placeholder="默认 300" step={50} integerOnly={false} />
+
+                    <button onClick={handleCalculate} className="w-full bg-blue-600 text-white text-4xl font-bold py-5 rounded-xl shadow-lg mt-4">快速估算</button>
+                    
+                    {result && (
+                        <div className="mt-8 space-y-6">
+                            <div className="p-4 rounded-xl border-2 border-orange-400 bg-orange-50 text-center">
+                                <p className="text-xl font-bold text-orange-800">真相暴击：</p>
+                                <p className="text-2xl text-gray-700 mt-1">
+                                    折算后真实成本: 
+                                    <span className="text-5xl font-extrabold text-orange-600 ml-2">
+                                        {result.trueCostPerJin.toFixed(2)}
+                                    </span> 元/斤
+                                </p>
+                            </div>
+
+                            {result.isProfitable ? (
+                                <div className="p-6 rounded-xl border-2 border-green-500 bg-green-100 text-center">
+                                    <p className="text-4xl font-bold text-green-700">🟢 可以拿！这车稳赚！</p>
+                                    <p className="text-xl text-green-600 mt-2">预计净赚约 <span className="text-3xl font-bold">{result.estimatedGrossProfit.toFixed(0)}</span> 元</p>
+                                </div>
+                            ) : (
+                                 <div className="p-6 rounded-xl border-2 border-red-500 bg-red-100 text-center">
+                                    <p className="text-4xl font-bold text-red-700">🔴 风险大！别冲动！</p>
+                                    <p className="text-xl text-red-600 mt-2">
+                                        想赚钱 (赚1000元)，必须把总价砍到 
+                                        <span className="block text-4xl font-extrabold text-red-700 my-2">
+                                            {Math.max(0, result.suggestedTotalPrice).toFixed(0)} 元
+                                        </span> 
+                                        ({Math.max(0, result.suggestedCostPerJin).toFixed(2)}元/斤) 以下！
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+
+        // --- Page 2: Daily Ledger (实战模式) ---
+        const DailyLedger = () => {
+            // --- Global Settings (persisted) ---
+            const [purchasePrice, setPurchasePrice] = useState('0.8');
+            const [wholesalePrice, setWholesalePrice] = useState('2.2');
+            const [retailPrice, setRetailPrice] = useState('2.8');
+            const [sandbagWeight, setSandbagWeight] = useState('3.5');
+            const [sandbagCost, setSandbagCost] = useState('0.2');
+            const [plasticBagWeight, setPlasticBagWeight] = useState('5.0');
+            const [plasticBagCost, setPlasticBagCost] = useState('0.1');
+            const [laborMode, setLaborMode] = useState('one_person');
+            const [customPeopleCount, setCustomPeopleCount] = useState('');
+            const [isStoveOn, setIsStoveOn] = useState(false);
+            const [stoveCost, setStoveCost] = useState('50');
+            const [isAcOn, setIsAcOn] = useState(false);
+            const [acCost, setAcCost] = useState('30');
+            const [spoilageRate, setSpoilageRate] = useState(0.05);
+            const [dailyMoistureLossRate, setDailyMoistureLossRate] = useState('1.0');
+
+            // --- Daily Input State ---
+            const [daysStored, setDaysStored] = useState(0);
+            const [fuelCost, setFuelCost] = useState('50');
+            const [sandbagWholesale, setSandbagWholesale] = useState('');
+            const [sandbagRetail, setSandbagRetail] = useState('');
+            const [plasticBagWholesale, setPlasticBagWholesale] = useState('');
+            const [plasticBagRetail, setPlasticBagRetail] = useState('');
+            const [rottenWeight, setRottenWeight] = useState('');
+
+            // --- Result State ---
+            const [result, setResult] = useState(null);
+
+            useEffect(() => {
+                try {
+                    const savedSettings = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+                    if (savedSettings) {
+                        setPurchasePrice(savedSettings.purchasePrice ?? '0.8');
+                        setWholesalePrice(savedSettings.wholesalePrice ?? '2.2');
+                        setRetailPrice(savedSettings.retailPrice ?? '2.8');
+                        setSandbagWeight(savedSettings.sandbagWeight ?? '3.5');
+                        setSandbagCost(savedSettings.sandbagCost ?? '0.2');
+                        setPlasticBagWeight(savedSettings.plasticBagWeight ?? '5.0');
+                        setPlasticBagCost(savedSettings.plasticBagCost ?? '0.1');
+                        setLaborMode(savedSettings.laborMode ?? 'one_person');
+                        setCustomPeopleCount(savedSettings.customPeopleCount ?? '');
+                        setIsStoveOn(savedSettings.isStoveOn ?? false);
+                        setStoveCost(savedSettings.stoveCost ?? '50');
+                        setIsAcOn(savedSettings.isAcOn ?? false);
+                        setAcCost(savedSettings.acCost ?? '30');
+                        setSpoilageRate(savedSettings.spoilageRate ?? 0.05);
+                        setDailyMoistureLossRate(savedSettings.dailyMoistureLossRate ?? '1.0');
+                    }
+                } catch (error) { console.error("Failed to load settings", error); }
+            }, []);
+
+            useEffect(() => {
+                const settingsToSave = {
+                    purchasePrice, wholesalePrice, retailPrice, sandbagWeight, sandbagCost,
+                    plasticBagWeight, plasticBagCost, laborMode, customPeopleCount,
+                    isStoveOn, stoveCost, isAcOn, acCost, spoilageRate, dailyMoistureLossRate
+                };
+                try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settingsToSave)); } 
+                catch (error) { console.error("Failed to save settings", error); }
+            }, [
+                purchasePrice, wholesalePrice, retailPrice, sandbagWeight, sandbagCost,
+                plasticBagWeight, plasticBagCost, laborMode, customPeopleCount,
+                isStoveOn, stoveCost, isAcOn, acCost, spoilageRate, dailyMoistureLossRate
+            ]);
+
+            const laborCost = useMemo(() => {
+                if (laborMode === 'one_person') return 90;
+                if (laborMode === 'two_people') return 180;
+                if (laborMode === 'custom') return (parseInt(customPeopleCount) || 0) * 90;
+                return 90;
+            }, [laborMode, customPeopleCount]);
+
+            const actualPurchasePrice = useMemo(() => {
+                const pPrice = parseFloat(purchasePrice) || 0;
+                const lossRate = (parseFloat(dailyMoistureLossRate) || 0) / 100;
+                const discountFactor = 1 - (daysStored * lossRate);
+                if (pPrice === 0 || discountFactor <= 0.1) return pPrice;
+                return pPrice / discountFactor;
+            }, [purchasePrice, daysStored, dailyMoistureLossRate]);
+
+            const sliderBgColor = useMemo(() => `hsl(${120 - (daysStored * (120 / 15))}, 70%, 50%)`, [daysStored]);
+
+            const handleCalculate = () => {
+                const wsPrice = parseFloat(wholesalePrice) || 0, rtPrice = parseFloat(retailPrice) || 0,
+                      sbWeight = parseFloat(sandbagWeight) || 0, sbCost = parseFloat(sandbagCost) || 0,
+                      pbWeight = parseFloat(plasticBagWeight) || 0, pbCost = parseFloat(plasticBagCost) || 0,
+                      sCost = parseFloat(stoveCost) || 0, aCost = parseFloat(acCost) || 0,
+                      fuelCostFloat = parseFloat(fuelCost) || 0, rottenWeightFloat = parseFloat(rottenWeight) || 0,
+                      sbWholesaleCount = parseInt(sandbagWholesale) || 0, sbRetailCount = parseInt(sandbagRetail) || 0,
+                      pbWholesaleCount = parseInt(plasticBagWholesale) || 0, pbRetailCount = parseInt(plasticBagRetail) || 0;
+
+                const totalWeightSold = (sbWholesaleCount + sbRetailCount) * sbWeight + (pbWholesaleCount + pbRetailCount) * pbWeight;
+                if (totalWeightSold <= 0) { alert("还没有卖货，没法计算哦！"); return; }
+
+                const totalBagCost = (sbWholesaleCount + sbRetailCount) * sbCost + (pbWholesaleCount + pbRetailCount) * pbCost;
+                const totalRevenue = (sbWholesaleCount * sbWeight * wsPrice) + (sbRetailCount * sbWeight * rtPrice) + (pbWholesaleCount * pbWeight * wsPrice) + (pbRetailCount * pbWeight * rtPrice);
+                const spoilageCost = rottenWeightFloat * actualPurchasePrice;
+                const totalMiscFees = laborCost + (isStoveOn ? sCost : 0) + (isAcOn ? aCost : 0) + fuelCostFloat + totalBagCost + spoilageCost;
+                const originalPurchasedWeight = totalWeightSold / (1 - spoilageRate);
+                const totalPurchaseCost = originalPurchasedWeight * actualPurchasePrice;
+                const totalExpenses = totalPurchaseCost + totalMiscFees;
+                const netProfit = totalRevenue - totalExpenses;
+                const grossProfit = totalRevenue - totalPurchaseCost;
+                const actualBreakEvenPrice = totalExpenses / totalWeightSold;
+                const averageSellingPrice = totalRevenue / totalWeightSold;
+
+                setResult({ netProfit, totalWeightSold, totalMiscFees, actualBreakEvenPrice, averageSellingPrice, grossProfit });
+            };
+
+            const handleClear = () => {
+                if (window.confirm("确定要清空今天的账单吗？")) {
+                    setDaysStored(0); setFuelCost('50'); setSandbagWholesale(''); setSandbagRetail('');
+                    setPlasticBagWholesale(''); setPlasticBagRetail(''); setRottenWeight(''); setResult(null);
+                }
+            };
+
+            const handleCopy = () => {
+                if (!result) return;
+                const d = new Date();
+                const today = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+                const summary = `【红薯生意账单】\n日期: ${today}\n存放天数: ${daysStored} 天\n总销量: ${result.totalWeightSold.toFixed(1)} 斤\n总净赚: ${result.netProfit.toFixed(2)} 元\n实际成本: ${result.actualBreakEvenPrice.toFixed(2)} 元/斤\n今日损耗: ${parseFloat(rottenWeight) || 0} 斤`;
+                navigator.clipboard.writeText(summary).then(() => alert("已复制，去微信粘贴！")).catch(err => alert("复制失败，请手动复制。"));
+            };
+
+            const isProfit = result && result.netProfit >= 0;
+
+            return (
+                <div className="w-full max-w-lg bg-white p-6 sm:p-8 rounded-2xl shadow-2xl border border-gray-200">
+                    <h1 className="text-4xl sm:text-5xl font-bold text-slate-800 text-center mb-6">今日记账</h1>
+                    
+                    <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-6 mb-8 text-center">
+                        <h2 className="text-3xl font-bold text-indigo-800 mb-4">这车货放了几天了？</h2>
+                        <input type="range" min="0" max="15" value={daysStored} onChange={(e) => setDaysStored(parseInt(e.target.value))} style={{'--slider-color': sliderBgColor }} className="w-full h-5 bg-gray-200 rounded-lg appearance-none cursor-pointer slider-track"/>
+                        <p className="text-2xl font-bold text-indigo-700 mt-4">{daysStored === 0 ? "刚进货 (无折损)" : `第 ${daysStored} 天 (重量缩水 ${(daysStored * (parseFloat(dailyMoistureLossRate) || 0)).toFixed(1)}%)`}</p>
+                        <div className={`mt-3 p-3 rounded-lg ${actualPurchasePrice > (parseFloat(purchasePrice) * 1.1) ? 'bg-red-100' : 'bg-indigo-100'}`}>
+                            <p className="text-xl font-medium text-gray-700">今日实际成本：</p>
+                            <p className={`text-5xl font-extrabold transition-colors ${actualPurchasePrice > (parseFloat(purchasePrice) * 1.1) ? 'text-red-600' : 'text-indigo-900'}`}>{actualPurchasePrice.toFixed(2)} <span className="text-3xl">元/斤</span></p>
+                        </div>
+                    </div>
+
+                    <details className="bg-gray-100 rounded-lg p-3 mb-6 border border-gray-300">
+                        <summary className="text-xl font-bold text-gray-700 cursor-pointer">基础设置 (点我修改)</summary>
+                        <div className="mt-4 pt-4 border-t border-gray-300 space-y-3">
+                            <SettingInput label="进货价" unit="元/斤" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} />
+                            <SettingInput label="批发卖价" unit="元/斤" value={wholesalePrice} onChange={e => setWholesalePrice(e.target.value)} />
+                            <SettingInput label="零售卖价" unit="元/斤" value={retailPrice} onChange={e => setRetailPrice(e.target.value)} />
+                            <hr className="my-3"/><SettingInput label="小沙袋重" unit="斤" value={sandbagWeight} onChange={e => setSandbagWeight(e.target.value)} /><SettingInput label="小沙袋成本" unit="元" value={sandbagCost} onChange={e => setSandbagCost(e.target.value)} />
+                            <hr className="my-3"/><SettingInput label="塑料袋重" unit="斤" value={plasticBagWeight} onChange={e => setPlasticBagWeight(e.target.value)} /><SettingInput label="塑料袋成本" unit="元" value={plasticBagCost} onChange={e => setPlasticBagCost(e.target.value)} />
+                            <hr className="my-3"/><SettingInput label="每日水分折损率" unit="%" value={dailyMoistureLossRate} onChange={e => setDailyMoistureLossRate(e.target.value)} />
+                        </div>
+                    </details>
+
+                    <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-6">
+                        <h2 className="text-3xl font-bold text-rose-800 mb-4">固定成本</h2>
+                        <div className="grid grid-cols-3 gap-3 mb-4">
+                           <button onClick={() => { setLaborMode('one_person'); setCustomPeopleCount(''); }} className={`py-3 text-xl font-bold rounded-lg ${laborMode === 'one_person' ? 'bg-rose-600 text-white' : 'bg-rose-200'}`}>1人 (90元)</button>
+                           <button onClick={() => { setLaborMode('two_people'); setCustomPeopleCount(''); }} className={`py-3 text-xl font-bold rounded-lg ${laborMode === 'two_people' ? 'bg-rose-600 text-white' : 'bg-rose-200'}`}>2人 (180元)</button>
+                           <button onClick={() => setLaborMode('custom')} className={`py-3 text-xl font-bold rounded-lg ${laborMode === 'custom' ? 'bg-rose-600 text-white' : 'bg-rose-200'}`}>自定义</button>
+                        </div>
+                        {laborMode === 'custom' && <InputWithSteppers label="自定义人数" unit="人" value={customPeopleCount} onChange={e => setCustomPeopleCount(e.target.value)} placeholder="输入人数" />}
+                        <CostToggleInput id="stove" label="开炉子" isChecked={isStoveOn} onToggleChange={setIsStoveOn} costValue={stoveCost} onCostChange={setStoveCost} />
+                        <CostToggleInput id="ac" label="开空调" isChecked={isAcOn} onToggleChange={setIsAcOn} costValue={acCost} onCostChange={setAcCost} />
+                        <InputWithSteppers label="油费/杂费" unit="元" value={fuelCost} onChange={e => setFuelCost(e.target.value)} placeholder="50" integerOnly={false} />
+                    </div>
+
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6">
+                        <h2 className="text-3xl font-bold text-emerald-800 mb-4">货物损耗率</h2>
+                        <div className="grid grid-cols-3 gap-3 sm:gap-4">{[{ label: '好货 2%', value: 0.02 }, { label: '通货 5%', value: 0.05 }, { label: '差货 10%', value: 0.10 }].map(o => (<RateButton key={o.value} label={o.label} isSelected={spoilageRate === o.value} onClick={() => setSpoilageRate(o.value)} />))}</div>
+                    </div>
+
+                    <h2 className="text-3xl font-bold text-green-800 mb-4">今日销量</h2>
+                    <SalesCard title={`小沙袋生意 (${sandbagWeight}斤)`} bgColor="bg-yellow-50 border-yellow-200" wholesaleCount={sandbagWholesale} setWholesaleCount={setSandbagWholesale} retailCount={sandbagRetail} setRetailCount={setSandbagRetail} />
+                    <SalesCard title={`塑料袋生意 (${plasticBagWeight}斤)`} bgColor="bg-blue-50 border-blue-200" wholesaleCount={plasticBagWholesale} setWholesaleCount={setPlasticBagWholesale} retailCount={plasticBagRetail} setRetailCount={setPlasticBagRetail} />
+                    
+                    <div className="bg-red-50/80 border-2 border-red-300 rounded-xl p-4 my-6"><h2 className="text-3xl font-bold text-red-800 mb-2">损耗录入</h2><InputWithSteppers label="今天挑拣出多少斤烂货/坏货？" unit="斤" value={rottenWeight} onChange={e => setRottenWeight(e.target.value)} placeholder="0" integerOnly={false} /></div>
+                    
+                    <div className="grid grid-cols-2 gap-4 mt-2">
+                        <button onClick={handleClear} className="w-full bg-gray-500 text-white text-3xl font-bold py-5 rounded-xl shadow-lg hover:bg-gray-600 active:scale-95 transition-transform">清空数据</button>
+                        <button onClick={handleCalculate} className="w-full bg-blue-600 text-white text-4xl font-bold py-5 rounded-xl shadow-lg hover:bg-blue-700 active:scale-95 transition-transform">一 键 算 账</button>
+                    </div>
+
+                    {result !== null && (<>
+                        <ProgressBar grossProfit={result.grossProfit} totalMiscFees={result.totalMiscFees} />
+                        <div className={`mt-6 p-6 rounded-xl border-2 text-center ${isProfit ? 'bg-green-100 border-green-500' : 'bg-red-100 border-red-500'}`}><p className={`text-3xl font-bold mb-2 ${isProfit ? 'text-green-800' : 'text-red-800'}`}>今日净利润</p><p className={`text-7xl font-extrabold ${isProfit ? 'text-green-600' : 'text-red-600'}`}>{result.netProfit.toFixed(2)} 元</p></div>
+                        <hr className="my-8 border-t-4 border-dashed border-gray-300" />
+                        <div className="bg-gray-100 border-2 border-gray-300 rounded-xl p-6 text-center mb-8"><h2 className="text-3xl font-bold text-gray-800 mb-4">成本透视</h2><p className="text-2xl text-gray-700">今天总共卖了 <span className="font-bold text-3xl text-black">{result.totalWeightSold.toFixed(1)}</span> 斤</p><p className="text-2xl text-gray-700 mt-2">今日总杂费 <span className="font-bold text-3xl text-black">{result.totalMiscFees.toFixed(2)}</span> 元</p><p className="text-sm text-gray-500 mt-1">(人工+炉子+空调+油费+袋子+烂货成本)</p></div>
+                        <div className="bg-orange-50 border-2 border-orange-300 rounded-xl p-6 text-center">
+                            <h2 className="text-3xl font-bold text-orange-800 mb-4">今日保本红线</h2><p className="text-2xl text-orange-900">你的实际成本价是：</p><p className="text-6xl font-extrabold text-orange-600 my-2">{result.actualBreakEvenPrice.toFixed(2)} 元/斤</p>
+                            {result.averageSellingPrice >= result.actualBreakEvenPrice ? (<div className="mt-4 bg-green-100 border border-green-400 rounded-lg p-3"><p className="text-2xl font-bold text-green-700">恭喜！卖价包住了费用</p><p className="text-xl text-green-600">平均每斤赚了 <span className="font-bold">{(result.averageSellingPrice - result.actualBreakEvenPrice).toFixed(2)}</span> 元</p></div>) : (<div className="mt-4 bg-red-100 border border-red-400 rounded-lg p-3"><p className="text-2xl font-bold text-red-700">警告！实际在亏本</p><p className="text-xl text-red-600">平均每斤亏了 <span className="font-bold">{(result.actualBreakEvenPrice - result.averageSellingPrice).toFixed(2)}</span> 元</p></div>)}
+                        </div>
+                        <div className="mt-8"><button onClick={handleCopy} className="w-full bg-green-600 text-white text-3xl font-bold py-5 rounded-xl shadow-lg hover:bg-green-700 active:scale-95 transition-transform">复制今日账单发微信</button></div>
+                    </>)}
+                </div>
+            );
+        };
+
+        // --- Page 3: Marketing Tools (卖货神器) ---
+        const MarketingTools = () => {
+            const [slogan, setSlogan] = useState('自家种 嘎嘎甜');
+            const [wholesalePrice, setWholesalePrice] = useState('2.2');
+            const [retailPrice, setRetailPrice] = useState('2.8');
+            const [posterVisible, setPosterVisible] = useState(false);
+
+            const [copyStyle, setCopyStyle] = useState('enthusiastic');
+            const [generatedCopy, setGeneratedCopy] = useState('');
+
+            useEffect(() => {
+                try {
+                    const savedSettings = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+                    if (savedSettings) {
+                        setWholesalePrice(savedSettings.wholesalePrice ?? '2.2');
+                        setRetailPrice(savedSettings.retailPrice ?? '2.8');
+                    }
+                } catch (error) { console.error("Failed to load marketing settings", error); }
+            }, []);
+
+            const copyTemplates = {
+                enthusiastic: [
+                    "🔥 刚出土的红薯！{PRICE}元一斤！个个流油，不甜不要钱！快来抢！",
+                    "🎉 大喇叭广播！今天红薯特价，只要{PRICE}元！又沙又甜，烤着吃煮着吃都美滋滋！",
+                    "📢 走过路过不要错过！新鲜红薯{PRICE}元一斤，甜过初恋，营养美味，数量有限，先到先得！"
+                ],
+                heartfelt: [
+                    "🌱 父母种点地不容易，都是汗水换来的良心货。只要{PRICE}元，尝尝这口实在的甜。",
+                    "👨‍🌾 没有那么多花里胡哨，就是老老实实种出来的红薯，{PRICE}元一斤，吃得放心。",
+                    "❤️ 天冷了，烤个热乎乎的红薯暖暖手吧。自家产的，{PRICE}元，是小时候的味道。"
+                ],
+                clearance: [
+                    "📢 最后半车，亏本清仓！{PRICE}元拿走！再不来就真没了，手慢无！",
+                    "💨 最后几小时，卖完收摊！红薯{PRICE}元一斤，给钱就卖，不计成本了！",
+                    "‼️ 紧急甩货！家里有事急着走，红薯{PRICE}元，帮帮忙给个油钱就行！"
+                ]
+            };
+            
+            const generateCopy = () => {
+                const templates = copyTemplates[copyStyle];
+                const randomIndex = Math.floor(Math.random() * templates.length);
+                const template = templates[randomIndex];
+                const priceToUse = copyStyle === 'clearance' ? wholesalePrice : retailPrice;
+                const newCopy = template.replace('{PRICE}', priceToUse);
+                setGeneratedCopy(newCopy);
+            };
+
+            const handleCopyToClipboard = () => {
+                if (!generatedCopy) {
+                    alert("请先生成文案！");
+                    return;
+                }
+                navigator.clipboard.writeText(generatedCopy)
+                    .then(() => alert("文案已复制！快去粘贴吧！"))
+                    .catch(err => alert("复制失败，请手动复制。"));
+            };
+
+            const today = new Date();
+            const formattedDate = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
+
+            return (
+                <div className="w-full max-w-lg bg-white p-6 sm:p-8 rounded-2xl shadow-2xl border border-gray-200">
+                    <h1 className="text-4xl sm:text-5xl font-bold text-slate-800 text-center mb-8">卖货神器</h1>
+                    
+                    {/* --- Module 1: Poster Generator --- */}
+                    <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6 mb-8">
+                        <h2 className="text-3xl font-bold text-red-800 mb-4">一键生成报价海报</h2>
+                        <div className="mb-4">
+                            <label className="block text-2xl font-medium text-gray-700 mb-2">今日主打语</label>
+                            <input type="text" value={slogan} onChange={e => setSlogan(e.target.value)} className="w-full text-3xl p-3 border-2 border-gray-300 rounded-lg"/>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                               <label className="block text-2xl font-medium text-gray-700 mb-2">批发价</label>
+                               <input type="number" value={wholesalePrice} onChange={e => setWholesalePrice(e.target.value)} className="w-full text-3xl p-3 border-2 border-gray-300 rounded-lg" />
+                            </div>
+                            <div>
+                               <label className="block text-2xl font-medium text-gray-700 mb-2">零售价</label>
+                               <input type="number" value={retailPrice} onChange={e => setRetailPrice(e.target.value)} className="w-full text-3xl p-3 border-2 border-gray-300 rounded-lg" />
+                            </div>
+                        </div>
+                        <button onClick={() => setPosterVisible(true)} className="w-full bg-red-600 text-white text-3xl font-bold py-5 rounded-xl shadow-lg hover:bg-red-700 active:scale-95 transition-transform">生成海报预览</button>
+                    </div>
+
+                    {/* Poster Modal */}
+                    {posterVisible && (
+                        <div className="fixed inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center z-50 p-4">
+                            <div className="bg-red-600 border-[10px] border-yellow-400 rounded-2xl p-6 text-yellow-300 w-full max-w-md text-center shadow-2xl relative">
+                                <button onClick={() => setPosterVisible(false)} className="absolute -top-4 -right-4 bg-white text-red-600 rounded-full h-12 w-12 text-3xl font-bold border-4 border-red-600">X</button>
+                                <p className="text-4xl font-bold mb-2">{formattedDate}</p>
+                                <p className="text-6xl font-extrabold tracking-widest border-b-4 border-dashed border-yellow-400 pb-4 mb-4">今日报价</p>
+                                <div className="my-6">
+                                    <p className="text-5xl font-bold">零售: <span className="text-8xl font-black">{retailPrice}</span> 元</p>
+                                    <p className="text-5xl font-bold mt-4">批发: <span className="text-8xl font-black">{wholesalePrice}</span> 元</p>
+                                </div>
+                                <p className="text-5xl font-bold bg-black bg-opacity-20 rounded-lg py-2">{slogan}</p>
+                                <p className="text-4xl font-semibold mt-4">欢迎品尝</p>
+                            </div>
+                            <p className="text-white text-3xl font-bold mt-6 text-center">👆 请直接手机截图发朋友圈 👆</p>
+                        </div>
+                    )}
+
+
+                    {/* --- Module 2: AI Copywriter --- */}
+                    <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6 mb-8">
+                        <h2 className="text-3xl font-bold text-green-800 mb-4">AI 金牌销售文案</h2>
+                        <div className="grid grid-cols-3 gap-3 mb-4">
+                            <button onClick={() => setCopyStyle('enthusiastic')} className={`py-3 text-xl font-bold rounded-lg ${copyStyle === 'enthusiastic' ? 'bg-green-600 text-white' : 'bg-green-200'}`}>热情吆喝</button>
+                            <button onClick={() => setCopyStyle('heartfelt')} className={`py-3 text-xl font-bold rounded-lg ${copyStyle === 'heartfelt' ? 'bg-green-600 text-white' : 'bg-green-200'}`}>情感走心</button>
+                            <button onClick={() => setCopyStyle('clearance')} className={`py-3 text-xl font-bold rounded-lg ${copyStyle === 'clearance' ? 'bg-green-600 text-white' : 'bg-green-200'}`}>紧急甩货</button>
+                        </div>
+                        <button onClick={generateCopy} className="w-full bg-green-600 text-white text-3xl font-bold py-5 rounded-xl shadow-lg hover:bg-green-700 active:scale-95 transition-transform mb-4">帮我想个词</button>
+                        {generatedCopy && (
+                            <div className="mt-4">
+                                <textarea readOnly value={generatedCopy} className="w-full text-2xl p-4 border-2 bg-white border-gray-300 rounded-lg h-48 mb-4"></textarea>
+                                <button onClick={handleCopyToClipboard} className="w-full bg-blue-600 text-white text-3xl font-bold py-5 rounded-xl shadow-lg hover:bg-blue-700 active:scale-95 transition-transform">一键复制文案</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+
+        // --- Main App Component with Navigation ---
+        const BottomNav = ({ activeTab, setActiveTab }) => {
+            const navItemClasses = "flex-1 text-center py-4 text-2xl font-bold transition-colors duration-300";
+            const activeClasses = "bg-blue-600 text-white";
+            const inactiveClasses = "bg-gray-200 text-gray-700 hover:bg-gray-300";
+
+            return (
+                <nav className="fixed bottom-0 left-0 right-0 h-24 bg-white shadow-[0_-5px_15px_-3px_rgba(0,0,0,0.1)] flex items-center justify-around z-40">
+                    <button onClick={() => setActiveTab('advisor')} className={`${navItemClasses} ${activeTab === 'advisor' ? activeClasses : inactiveClasses}`}>
+                        进货参考
+                    </button>
+                    <div className="w-px h-16 bg-gray-300"></div>
+                    <button onClick={() => setActiveTab('ledger')} className={`${navItemClasses} ${activeTab === 'ledger' ? activeClasses : inactiveClasses}`}>
+                        今日记账
+                    </button>
+                    <div className="w-px h-16 bg-gray-300"></div>
+                    <button onClick={() => setActiveTab('marketing')} className={`${navItemClasses} ${activeTab === 'marketing' ? activeClasses : inactiveClasses}`}>
+                        卖货神器
+                    </button>
+                </nav>
+            );
+        };
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('ledger');
+
+            return (
+                <div className={`min-h-screen bg-slate-100 flex items-start justify-center p-4 pb-32`}>
+                   {activeTab === 'advisor' && <PurchaseAdvisor />}
+                   {activeTab === 'ledger' && <DailyLedger />}
+                   {activeTab === 'marketing' && <MarketingTools />}
+                   <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+                </div>
+            );
+        }
+
+        // --- Mount the App to the DOM ---
+        const rootElement = document.getElementById('root');
+        if (!rootElement) {
+          throw new Error("Could not find root element to mount to");
+        }
+
+        const root = ReactDOM.createRoot(rootElement);
+        root.render(
+          <React.StrictMode>
+            <App />
+          </React.StrictMode>
+        );
+    </script>
+  </body>
+</html>
